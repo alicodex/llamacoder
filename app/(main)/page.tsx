@@ -25,7 +25,6 @@ import {
 
 import { Context } from "./providers";
 import Header from "@/components/header";
-import { useS3Upload } from "next-s3-upload";
 import UploadIcon from "@/components/icons/upload-icon";
 import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
 
@@ -53,8 +52,6 @@ export default function Home() {
     }
   }, []);
 
-  const { uploadToS3 } = useS3Upload();
-
   const selectedModel = useMemo(
     () => MODELS.find((m) => m.value === model),
     [model],
@@ -72,7 +69,10 @@ export default function Home() {
     setQuality("low");
     setScreenshotLoading(true);
     let file = event.target.files[0];
-    const { url } = await uploadToS3(file);
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const { url } = await res.json();
     setScreenshotUrl(url);
     setScreenshotLoading(false);
   };
@@ -523,5 +523,3 @@ function LoadingMessage({
   );
 }
 
-export const runtime = "edge";
-export const maxDuration = 60;
