@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import {
   getMainCodingPrompt,
-  screenshotToCodePrompt,
-  softwareArchitectPrompt,
+  getScreenshotToCodePrompt,
+  getSoftwareArchitectPrompt,
 } from "@/lib/prompts";
+import { getUtilityModel, getVisionModel } from "@/lib/constants.server";
+import { getSetting } from "@/lib/settings";
 import Together from "together-ai";
 
 export async function POST(request: NextRequest) {
@@ -22,11 +24,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Use DB-stored API key if available, otherwise fall back to env var
+    const apiKey =
+      (await getSetting("together_api_key")) ||
+      process.env.TOGETHER_API_KEY;
+    const heliconeKey =
+      (await getSetting("helicone_api_key")) ||
+      process.env.HELICONE_API_KEY;
+
     let options: ConstructorParameters<typeof Together>[0] = {};
-    if (process.env.HELICONE_API_KEY) {
+    if (apiKey) options.apiKey = apiKey;
+    if (heliconeKey) {
       options.baseURL = "https://together.helicone.ai/v1";
       options.defaultHeaders = {
-        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+        "Helicone-Auth": `Bearer ${heliconeKey}`,
         "Helicone-Property-appname": "LlamaCoder",
         "Helicone-Session-Id": chat.id,
         "Helicone-Session-Name": "LlamaCoder Chat",
@@ -34,10 +45,12 @@ export async function POST(request: NextRequest) {
     }
 
     const together = new Together(options);
+    const utilityModel = await getUtilityModel();
+    const visionModel = await getVisionModel();
 
     async function fetchTitle() {
       const responseForChatTitle = await together.chat.completions.create({
-        model: "Qwen/Qwen3-Next-80B-A3B-Instruct",
+        model: utilityModel,
         messages: [
           {
             role: "system",
@@ -56,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     async function fetchTopExample() {
       const findSimilarExamples = await together.chat.completions.create({
-        model: "Qwen/Qwen3-Next-80B-A3B-Instruct",
+        model: utilityModel,
         messages: [
           {
             role: "system",
@@ -87,15 +100,16 @@ export async function POST(request: NextRequest) {
 
     let fullScreenshotDescription;
     if (screenshotUrl) {
+      const screenshotPrompt = await getScreenshotToCodePrompt();
       const screenshotResponse = await together.chat.completions.create({
-        model: "moonshotai/Kimi-K2.5",
+        model: visionModel,
         temperature: 0.4,
         max_tokens: 1000,
         messages: [
           {
             role: "user",
             content: [
-              { type: "text", text: screenshotToCodePrompt },
+              { type: "text", text: screenshotPrompt },
               {
                 type: "image_url",
                 image_url: {
@@ -113,13 +127,13 @@ export async function POST(request: NextRequest) {
 
     let userMessage: string;
     if (quality === "high") {
+      const architectPrompt = await getSoftwareArchitectPrompt();
       let initialRes = await together.chat.completions.create({
-        model: "Qwen/Qwen3-Next-80B-A3B-Instruct",
-        // model: "moonshotai/Kimi-K2-Thinking",
+        model: utilityModel,
         messages: [
           {
             role: "system",
-            content: softwareArchitectPrompt,
+            content: architectPrompt,
           },
           {
             role: "user",
@@ -144,6 +158,8 @@ export async function POST(request: NextRequest) {
       userMessage = prompt;
     }
 
+    const mainCodingPrompt = await getMainCodingPrompt(mostSimilarExample);
+
     let newChat = await prisma.chat.update({
       where: {
         id: chat.id,
@@ -155,7 +171,7 @@ export async function POST(request: NextRequest) {
             data: [
               {
                 role: "system",
-                content: getMainCodingPrompt(mostSimilarExample),
+                content: mainCodingPrompt,
                 position: 0,
               },
               { role: "user", content: userMessage, position: 1 },

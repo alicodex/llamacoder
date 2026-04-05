@@ -13,6 +13,10 @@ pages_build_output_dir = ".open-next/output"
 #   NEXT_PUBLIC_SUPABASE_ANON_KEY
 #   SITE_URL              (your *.pages.dev URL)
 #
+# Admin dashboard:
+#   ADMIN_PASSWORD
+#   ADMIN_SESSION_SECRET
+#
 # Optional:
 #   HELICONE_API_KEY
 #   CSB_API_KEY

@@ -1,4 +1,5 @@
 import { getPrisma } from "@/lib/prisma";
+import { getSetting } from "@/lib/settings";
 import { z } from "zod";
 import Together from "together-ai";
 
@@ -59,11 +60,19 @@ export async function POST(req: Request) {
     messages = [messages[0], messages[1], messages[2], ...messages.slice(-7)];
   }
 
+  const apiKey =
+    (await getSetting("together_api_key")) ||
+    process.env.TOGETHER_API_KEY;
+  const heliconeKey =
+    (await getSetting("helicone_api_key")) ||
+    process.env.HELICONE_API_KEY;
+
   let options: ConstructorParameters<typeof Together>[0] = {};
-  if (process.env.HELICONE_API_KEY) {
+  if (apiKey) options.apiKey = apiKey;
+  if (heliconeKey) {
     options.baseURL = "https://together.helicone.ai/v1";
     options.defaultHeaders = {
-      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+      "Helicone-Auth": `Bearer ${heliconeKey}`,
       "Helicone-Property-appname": "LlamaCoder",
       "Helicone-Session-Id": message.chatId,
       "Helicone-Session-Name": "LlamaCoder Chat",

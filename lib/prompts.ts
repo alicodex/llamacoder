@@ -1,7 +1,8 @@
 import dedent from "dedent";
 import shadcnDocs from "./shadcn-docs";
+import { getSetting } from "./settings";
 
-export const softwareArchitectPrompt = dedent`
+export const defaultSoftwareArchitectPrompt = dedent`
 You are an expert software architect and product lead responsible for taking an idea of an app, analyzing it, and producing an implementation plan for a single page React frontend app. You are describing a plan for a multi-file React + Tailwind CSS + TypeScript app with the ability to use Lucide React for icons and Shadcn UI for components.
 Don't use @chakra-ui/react and don't use @headlessui/react.
 Just use Shacdn UI components with tailwind!
@@ -21,7 +22,7 @@ Guidelines:
 If given a description of a screenshot, produce an implementation plan based on trying to replicate it as closely as possible.
 `;
 
-export const screenshotToCodePrompt = dedent`
+export const defaultScreenshotToCodePrompt = dedent`
 Describe the attached screenshot in detail. I will send what you give me to a developer to recreate the original screenshot of a website that I sent you. Please listen very carefully. It's very important for my job that you follow these instructions:
 
 - Think step by step and describe the UI in great detail.
@@ -31,7 +32,7 @@ Describe the attached screenshot in detail. I will send what you give me to a de
 - Make sure to use the exact text from the screenshot.
 `;
 
-export function getMainCodingPrompt(mostSimilarExample: string) {
+export function getDefaultMainCodingPrompt(mostSimilarExample: string) {
   let systemPrompt = `
   # LlamaCoder
 
@@ -182,4 +183,46 @@ export function getMainCodingPrompt(mostSimilarExample: string) {
   // }
 
   return dedent(systemPrompt);
+}
+
+export async function getSoftwareArchitectPrompt(): Promise<string> {
+  const custom = await getSetting("system_prompt_architect");
+  return custom ?? defaultSoftwareArchitectPrompt;
+}
+
+export async function getScreenshotToCodePrompt(): Promise<string> {
+  const custom = await getSetting("system_prompt_screenshot");
+  return custom ?? defaultScreenshotToCodePrompt;
+}
+
+export async function getMainCodingPrompt(
+  mostSimilarExample: string,
+): Promise<string> {
+  const custom = await getSetting("system_prompt_coding");
+  if (custom) return custom;
+
+  let prompt = getDefaultMainCodingPrompt(mostSimilarExample);
+
+  const designParams = await getSetting("design_parameters");
+  if (designParams) {
+    try {
+      const params = JSON.parse(designParams) as Record<string, string>;
+      let extra = "\n\n  ## Custom Design Parameters\n\n";
+      if (params.colorPalette)
+        extra += `  **Color Palette:** ${params.colorPalette}\n`;
+      if (params.typography)
+        extra += `  **Typography:** ${params.typography}\n`;
+      if (params.layoutRules)
+        extra += `  **Layout Rules:** ${params.layoutRules}\n`;
+      if (params.backgroundRules)
+        extra += `  **Background Rules:** ${params.backgroundRules}\n`;
+      if (params.additionalInstructions)
+        extra += `  **Additional Instructions:** ${params.additionalInstructions}\n`;
+      prompt += extra;
+    } catch {
+      // Invalid JSON, skip
+    }
+  }
+
+  return prompt;
 }

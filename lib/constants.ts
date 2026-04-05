@@ -1,4 +1,7 @@
-export const MODELS = [
+export type Model = { label: string; value: string; hidden?: boolean };
+export type SuggestedPrompt = { title: string; description: string };
+
+export const MODELS: Model[] = [
   {
     label: "GLM 4.6",
     value: "zai-org/GLM-4.6",
@@ -32,7 +35,7 @@ export const MODELS = [
   },
 ];
 
-export const SUGGESTED_PROMPTS = [
+export const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
   {
     title: "Quiz app",
     description:
@@ -69,3 +72,4 @@ export const SUGGESTED_PROMPTS = [
       "Make me a time zone dashboard that shows me the time zone in the top 6 most popular time zones and gives me a dropdown to add others",
   },
 ];
+
